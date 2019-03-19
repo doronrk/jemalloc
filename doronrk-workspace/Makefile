@@ -1,8 +1,8 @@
 CC=g++
-CFLAGS=-I.
-
-jemalloc_mesh: jemalloc_mesh.o
-	$(CC) -o build/jemalloc_mesh jemalloc_mesh.o -L`jemalloc-config --libdir` -Wl,-rpath,`jemalloc-config --libdir` -ljemalloc `jemalloc-config --libs` && rm jemalloc_mesh.o
+CFLAGS=-g -std=c++11 -Wall -pedantic
+ 
+jemalloc_mesh:
+	$(CC) $(CFLAGS) -o build/jemalloc_mesh -L`jemalloc-config --libdir` -Wl,-rpath,`jemalloc-config --libdir` -ljemalloc `jemalloc-config --libs` jemalloc_mesh.cpp 
 
 run:
 	MALLOC_CONF="log:$(log)" ./build/jemalloc_mesh
@@ -11,7 +11,7 @@ gdb:
 	MALLOC_CONF="log:$(log)" gdb ./build/jemalloc_mesh
 
 jem:
-	cd ../ && sudo make && sudo make install
+	cd ../ && make && make dist && sudo make install
 
 cfg:
-	cd ../ && ./configure --enable-debug --enable-log
+	cd ../ && ./autogen.sh --enable-debug --enable-log

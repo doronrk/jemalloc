@@ -50,6 +50,7 @@ JEMALLOC_EXPORT int JEMALLOC_NOTHROW	@je_@mallctlbymib(const size_t *mib,
 JEMALLOC_EXPORT void JEMALLOC_NOTHROW	@je_@malloc_stats_print(
     void (*write_cb)(void *, const char *), void *@je_@cbopaque,
     const char *opts);
+JEMALLOC_EXPORT void JEMALLOC_NOTHROW	@je_@doronrk_mesh();
 JEMALLOC_EXPORT size_t JEMALLOC_NOTHROW	@je_@malloc_usable_size(
     JEMALLOC_USABLE_SIZE_CONST void *ptr) JEMALLOC_CXX_THROW;
 

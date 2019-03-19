@@ -2502,6 +2502,7 @@ ifree(tsd_t *tsd, void *ptr, tcache_t *tcache, bool slow_path) {
 		*tsd_thread_deallocatedp_get(tsd) += usize;
 	}
 
+	// doronrk: why the branch here? 
 	if (likely(!slow_path)) {
 		idalloctm(tsd_tsdn(tsd), ptr, tcache, &alloc_ctx, false,
 		    false);
@@ -3624,6 +3625,11 @@ je_malloc_stats_print(void (*write_cb)(void *, const char *), void *cbopaque,
 	stats_print(write_cb, cbopaque, opts);
 	check_entry_exit_locking(tsdn);
 	LOG("core.malloc_stats_print.exit", "");
+}
+
+JEMALLOC_EXPORT void JEMALLOC_NOTHROW
+je_doronrk_mesh() {
+	LOG("doronrk", "doronrk_mesh");
 }
 
 JEMALLOC_EXPORT size_t JEMALLOC_NOTHROW

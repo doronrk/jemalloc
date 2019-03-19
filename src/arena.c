@@ -1600,6 +1600,10 @@ arena_dissociate_bin_slab(arena_t *arena, extent_t *slab, bin_t *bin) {
 		 * slab only contains one region, then it never gets inserted
 		 * into the non-full slabs heap.
 		 */
+		
+		// doronrk:
+		// If slabs with nregs == 1 are never inserted into non-full slabs
+		// heap, then where are they placed when nfree is 1?
 		if (bin_info->nregs == 1) {
 			arena_bin_slabs_full_remove(arena, bin, slab);
 		} else {
