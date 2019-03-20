@@ -30,6 +30,7 @@ void mesh_test() {
 }
 
 void flush() {
+
 	int num = 11;
 	std::vector<void*> ptrs;
 	auto talloc = std::thread([num, &ptrs](){
@@ -52,7 +53,6 @@ void flush() {
 
 int main(int argc, char** argv) {
 	doronrk_mesh();
-	//malloc_stats_print(NULL, NULL, NULL);
 	std::cout << "ran the program" << std::endl;
 	return 0;
 }

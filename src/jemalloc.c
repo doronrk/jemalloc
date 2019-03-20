@@ -3627,9 +3627,61 @@ je_malloc_stats_print(void (*write_cb)(void *, const char *), void *cbopaque,
 	LOG("core.malloc_stats_print.exit", "");
 }
 
+void doronrk_nonfull_extents(extent_t* extent, int depth) {
+	if (extent == NULL) {
+		return;
+	}
+	LOG("doronrk", "non-null extent: %p, eaddr: %p", extent, extent->e_addr);
+}
+
+void doronrk_mesh_bin(bin_t* bin) {
+	LOG("doronrk", "bin: %p", bin);
+	extent_t* auxelm;
+	extent_heap_t* slabs_nonfull = &bin->slabs_nonfull;
+
+	if (slabs_nonfull->ph_root == NULL) {
+		LOG("doronrk", "it was null");
+		return;
+	}
+	
+	doronrk_nonfull_extents(slabs_nonfull->ph_root, 0);
+	for (auxelm = phn_next_get(extent_t, ph_link, slabs_nonfull->ph_root); auxelm != NULL;
+	    auxelm = phn_next_get(extent_t, ph_link, auxelm)) {
+		doronrk_nonfull_extents(auxelm, 0);
+	}
+}
+
+void doronrk_mesh_arena(arena_t* arena) {
+	LOG("doronrk", "arena: %p", arena);
+	unsigned i, j;
+	for (i = 0; i < SC_NBINS; i++) {
+		bin_info_t* bin_info = &bin_infos[i];
+		LOG("doronrk", "bin_info->reg_size: %d", bin_info->reg_size);
+		LOG("doronrk", "bin_info->slab_size: %d", bin_info->slab_size);
+		LOG("doronrk", "bin_info->n_regs: %d", bin_info->nregs);
+		LOG("doronrk", "bin_info->n_shards: %d", bin_info->n_shards);
+		bins_t* bins = &arena->bins[i];
+		for (j = 0; j < bin_info->n_shards; j++) {
+			bin_t* bin = &bins->bin_shards[j];
+			doronrk_mesh_bin(bin);
+		}
+		LOG("doronrk", "\n");
+	}
+}
+
 JEMALLOC_EXPORT void JEMALLOC_NOTHROW
 je_doronrk_mesh() {
+	unsigned narenas, i;
+	tsdn_t *tsdn;
+	
 	LOG("doronrk", "doronrk_mesh");
+	tsdn = tsdn_fetch();
+	for (i = 0, narenas = narenas_total_get(); i < narenas; i++) {
+		arena_t *arena = arena_get(tsdn, i, false);
+		if (arena != NULL) {
+			doronrk_mesh_arena(arena);
+		}	
+	}
 }
 
 JEMALLOC_EXPORT size_t JEMALLOC_NOTHROW
