@@ -2,6 +2,7 @@
 #include "jemalloc/internal/jemalloc_preamble.h"
 #include "jemalloc/internal/jemalloc_internal_includes.h"
 
+#include "jemalloc/internal/log.h"
 #include "jemalloc/internal/assert.h"
 #include "jemalloc/internal/div.h"
 #include "jemalloc/internal/extent_dss.h"
@@ -1666,10 +1667,13 @@ arena_dalloc_bin_locked_impl(tsdn_t *tsdn, arena_t *arena, bin_t *bin,
 
 	arena_slab_reg_dalloc(slab, slab_data, ptr);
 	unsigned nfree = extent_nfree_get(slab);
+	//LOG("doronrk", "extent addr: %p, ptr: %p, nfree: %d", slab->e_addr, ptr, nfree); 
 	if (nfree == bin_info->nregs) {
+		//LOG("doronrk", "full case");
 		arena_dissociate_bin_slab(arena, slab, bin);
 		arena_dalloc_bin_slab(tsdn, arena, slab, bin);
 	} else if (nfree == 1 && slab != bin->slabcur) {
+		//LOG("doronrk", "lower slab case");
 		arena_bin_slabs_full_remove(arena, bin, slab);
 		arena_bin_lower_slab(tsdn, arena, slab, bin);
 	}
