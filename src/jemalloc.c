@@ -3636,7 +3636,7 @@ void doronrk_print_extent(extent_t* extent, int depth) {
 	szind_t binind  = extent_szind_get(extent);
 	const bin_info_t* bin_info = &bin_infos[binind];	
 	const bitmap_info_t* bitmap_info = &bin_info->bitmap_info;
-	char buf[LG_BITMAP_MAXBITS + 1];
+	char buf[(1 << LG_BITMAP_MAXBITS) + 1];
 	unsigned i;
 	for (i = 0; i < bitmap_info->nbits; i++) {
 		if (bitmap_get(slab_data->bitmap, bitmap_info, i)) {
@@ -3646,7 +3646,7 @@ void doronrk_print_extent(extent_t* extent, int depth) {
 		}
 	}	
 	buf[i] = '\0';
-	LOG("doronrk", "depth: %d, extent: %p, eaddr: %p, nfree: %d, bitmap: %s", depth, extent, extent->e_addr, nfree, buf);
+	LOG("doronrk", "depth: %d, extent: %p, eaddr: %p, nfree: %d, nbits: %d, bitmap: %s", depth, extent, extent->e_addr, nfree, bitmap_info->nbits, buf);
 }
 
 void doronrk_nonfull_extents(extent_t* extent, int depth) {
@@ -3736,6 +3736,7 @@ je_doronrk_mesh() {
 			doronrk_mesh_arena(arena, tcache);
 		}	
 	}
+	LOG("doronrk", "SC_SMALL_MAXCLASS: %d", SC_SMALL_MAXCLASS);
 }
 
 JEMALLOC_EXPORT size_t JEMALLOC_NOTHROW
