@@ -85,6 +85,7 @@ test/include/test/jemalloc_test_defs.h
 *.tmp
 *.swp
 *.swo
+*.swn
 .vs/
 /msvc/Win32/
 /msvc/x64/

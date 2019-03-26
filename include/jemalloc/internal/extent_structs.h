@@ -176,6 +176,8 @@ struct extent_s {
 			atomic_p_t		e_prof_tctx;
 		};
 	};
+
+	extent_t		*mesh_dst;
 };
 typedef ql_head(extent_t) extent_list_t;
 typedef ph(extent_t) extent_tree_t;

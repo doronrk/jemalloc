@@ -363,6 +363,7 @@ extent_init(extent_t *extent, arena_t *arena, void *addr, size_t size,
 	if (config_prof) {
 		extent_prof_tctx_set(extent, NULL);
 	}
+	extent->mesh_dst = NULL;
 }
 
 static inline void

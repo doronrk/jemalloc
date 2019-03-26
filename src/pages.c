@@ -23,8 +23,10 @@
 #endif
 #endif
 
-atomic_u_t memfd_offset;
+atomic_u_t memfd_offset; // in units of pages
+void* mem_base;
 int memfd;
+size_t mem_size = (1l << 30) * 20; // 20 GB
 
 /******************************************************************************/
 /* Data. */
@@ -86,10 +88,16 @@ os_pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
 	 */
 	{
 		int prot = *commit ? PAGES_PROT_COMMIT : PAGES_PROT_DECOMMIT;
-	
-		unsigned offset = atomic_fetch_add_u(&memfd_offset, size, ATOMIC_RELAXED);
-		ret = mmap(addr, size, prot, mmap_flags, memfd, offset);
-		LOG("doronrk", "addr: %p\t\tret: %p\t\toffset: %u\t\tmemfd: %d", addr, ret, offset, memfd); 
+		assert((size & PAGE_MASK) == 0);
+		if (addr == NULL && memfd > 0) {
+			unsigned offset = atomic_fetch_add_u(&memfd_offset, size >> LG_PAGE, ATOMIC_RELAXED);
+			ret = mem_base + (offset << LG_PAGE);
+			assert(ret >= mem_base && ret < mem_base + mem_size);
+			LOG("doronrk", "size: %lu\t\tret: %p\t\toffset: %u\t\tmemfd: %d", size, ret, offset, memfd); 
+		} else {
+			ret = mmap(addr, size, prot, mmap_flags, -1, 0);
+			LOG("doronrk", "anon mapping");
+		}
 	}
 	assert(ret != NULL);
 
@@ -644,8 +652,10 @@ pages_boot(void) {
 	 * FreeBSD doesn't need the check; madvise(2) is known to work.
 	 */
 #else
-	memfd = syscall(319, "jemalloc_memfd", 0);
-	LOG("doronrk", "memfd: %d, memfd_offset: %d", memfd, atomic_load_u(&memfd_offset, ATOMIC_RELAXED));;
+	memfd = syscall(__NR_memfd_create, "jemalloc_memfd", 0);
+	mem_base = mmap(NULL, mem_size, (PROT_READ | PROT_WRITE), mmap_flags, memfd, 0);
+	LOG("doronrk", "mem_base: %p", mem_base);
+	//LOG("doronrk", "memfd: %d, memfd_offset: %d", memfd, atomic_load_u(&memfd_offset, ATOMIC_RELAXED));;
 	/* Detect lazy purge runtime support. */
 	if (pages_can_purge_lazy) {
 		bool committed = false;
