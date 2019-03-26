@@ -8,12 +8,23 @@
 #include "jemalloc/internal/assert.h"
 #include "jemalloc/internal/malloc_io.h"
 
+
+#include "jemalloc/internal/log.h"
+
+// TODO doronrk: all these includes are probably not necessary
+#include <sys/mman.h>
+#include <bits/syscall.h>
+#include <asm/unistd_64.h>
+
 #ifdef JEMALLOC_SYSCTL_VM_OVERCOMMIT
 #include <sys/sysctl.h>
 #ifdef __FreeBSD__
 #include <vm/vm_param.h>
 #endif
 #endif
+
+atomic_u_t memfd_offset;
+int memfd;
 
 /******************************************************************************/
 /* Data. */
@@ -75,12 +86,15 @@ os_pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
 	 */
 	{
 		int prot = *commit ? PAGES_PROT_COMMIT : PAGES_PROT_DECOMMIT;
-
-		ret = mmap(addr, size, prot, mmap_flags, -1, 0);
+	
+		unsigned offset = atomic_fetch_add_u(&memfd_offset, size, ATOMIC_RELAXED);
+		ret = mmap(addr, size, prot, mmap_flags, memfd, offset);
+		LOG("doronrk", "addr: %p\t\tret: %p\t\toffset: %u\t\tmemfd: %d", addr, ret, offset, memfd); 
 	}
 	assert(ret != NULL);
 
 	if (ret == MAP_FAILED) {
+		LOG("doronrk", "MAP_FAILED, errno: %d", errno);
 		ret = NULL;
 	} else if (addr != NULL && ret != addr) {
 		/*
@@ -630,6 +644,8 @@ pages_boot(void) {
 	 * FreeBSD doesn't need the check; madvise(2) is known to work.
 	 */
 #else
+	memfd = syscall(319, "jemalloc_memfd", 0);
+	LOG("doronrk", "memfd: %d, memfd_offset: %d", memfd, atomic_load_u(&memfd_offset, ATOMIC_RELAXED));;
 	/* Detect lazy purge runtime support. */
 	if (pages_can_purge_lazy) {
 		bool committed = false;
@@ -644,6 +660,5 @@ pages_boot(void) {
 		os_pages_unmap(madv_free_page, PAGE);
 	}
 #endif
-
 	return false;
 }

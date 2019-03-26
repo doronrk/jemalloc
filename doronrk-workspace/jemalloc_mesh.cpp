@@ -25,6 +25,14 @@ void mesh_test() {
 
 	// Should be meshed here
 
+	// begin mesh
+	
+
+
+
+
+	// end mesh
+	
 	free(mem1a);
 	free(mem2b);
 }
@@ -67,7 +75,8 @@ void allocate_some() {
 }
 
 int main(int argc, char** argv) {
-	allocate_some();
+	mesh_test();
 	std::cout << "ran the program" << std::endl;
+	
 	return 0;
 }
