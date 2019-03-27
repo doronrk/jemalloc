@@ -77,6 +77,9 @@ struct bin_s {
 
 	/* List used to track full slabs. */
 	extent_list_t		slabs_full;
+	
+	/* List used to track meshed slabs. */
+	extent_list_t		slabs_meshed;
 
 	/* Bin statistics. */
 	bin_stats_t	stats;

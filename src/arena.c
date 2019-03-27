@@ -1035,6 +1035,19 @@ arena_bin_slabs_full_insert(arena_t *arena, bin_t *bin, extent_t *slab) {
 	extent_list_append(&bin->slabs_full, slab);
 }
 
+void
+arena_bin_slabs_meshed_insert(arena_t *arena, bin_t *bin, extent_t *slab) {
+	/*
+	 *  Tracking extents is required by arena_reset, which is not allowed
+	 *  for auto arenas.  Bypass this step to avoid touching the extent
+	 *  linkage (often results in cache misses) for auto arenas.
+	 */
+	if (arena_is_auto(arena)) {
+		return;
+	}
+	extent_list_append(&bin->slabs_meshed, slab);
+}
+
 static void
 arena_bin_slabs_full_remove(arena_t *arena, bin_t *bin, extent_t *slab) {
 	if (arena_is_auto(arena)) {
@@ -1067,6 +1080,7 @@ arena_bin_reset(tsd_t *tsd, arena_t *arena, bin_t *bin) {
 		arena_slab_dalloc(tsd_tsdn(tsd), arena, slab);
 		malloc_mutex_lock(tsd_tsdn(tsd), &bin->lock);
 	}
+	// TODO handle meshed extents here
 	if (config_stats) {
 		bin->stats.curregs = 0;
 		bin->stats.curslabs = 0;
@@ -1605,6 +1619,10 @@ arena_dissociate_bin_slab(arena_t *arena, extent_t *slab, bin_t *bin) {
 		// doronrk:
 		// If slabs with nregs == 1 are never inserted into non-full slabs
 		// heap, then where are they placed when nfree is 1?
+		
+		// Answer: because just prior in the only callsite of this function
+		// nfree was just incrememted from 0 to 1, so you know this extent
+		// has been previously sitting in full list.
 		if (bin_info->nregs == 1) {
 			arena_bin_slabs_full_remove(arena, bin, slab);
 		} else {
@@ -1665,6 +1683,8 @@ arena_dalloc_bin_locked_impl(tsdn_t *tsdn, arena_t *arena, bin_t *bin,
 		arena_dalloc_junk_small(ptr, bin_info);
 	}
 
+	
+	// TODO doronrk: mesh stuff here	
 	arena_slab_reg_dalloc(slab, slab_data, ptr);
 	unsigned nfree = extent_nfree_get(slab);
 	//LOG("doronrk", "extent addr: %p, ptr: %p, nfree: %d", slab->e_addr, ptr, nfree); 

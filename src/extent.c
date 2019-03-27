@@ -2282,7 +2282,6 @@ extent_mesh(arena_t *arena, bin_t *bin, bin_info_t *bin_info, extent_t *src, ext
 		}
 	}	
 	for (size_t i = 0; i < bm_info->nbits; i++) {
-		// update extent_nfree_get ret value? 
 		if (bitmap_get(slab_data_src->bitmap, bm_info, i)) {
 			LOG("doronrk", "extent_addr_get(src): %p, extent_addr_get(dst): %p, i: %lu, reg_size: %lu", extent_addr_get(src), extent_addr_get(dst), i, bin_info->reg_size);  
 			void *src_region = extent_addr_get(src) + (i * bin_info->reg_size);
@@ -2296,6 +2295,9 @@ extent_mesh(arena_t *arena, bin_t *bin, bin_info_t *bin_info, extent_t *src, ext
 	pages_mesh(extent_addr_get(src), extent_addr_get(dst), bin_info->slab_size);
 
 	src->mesh_dst = dst;
+	arena_bin_slabs_nonfull_remove(bin, src);
+	arena_bin_slabs_meshed_insert(arena, bin, src);
+
 	if (extent_nfree_get(dst) == 0) {
 		LOG("doronrk", "dst is now full");
 		arena_bin_slabs_nonfull_remove(bin, dst);

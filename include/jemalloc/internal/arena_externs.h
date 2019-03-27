@@ -102,6 +102,7 @@ void arena_postfork_parent(tsdn_t *tsdn, arena_t *arena);
 void arena_postfork_child(tsdn_t *tsdn, arena_t *arena);
 void arena_bin_slabs_nonfull_remove(bin_t *bin, extent_t *slab);
 void arena_bin_slabs_full_insert(arena_t *arena, bin_t *bin, extent_t *slab);
+void arena_bin_slabs_meshed_insert(arena_t *arena, bin_t *bin, extent_t *slab);
 
 
 #endif /* JEMALLOC_INTERNAL_ARENA_EXTERNS_H */
