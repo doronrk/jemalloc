@@ -219,6 +219,10 @@ pages_mesh(void *src_addr, void *dst_addr, size_t size)
 	unsigned dst_offset = get_offset(dst_addr);
 	void *ret = mmap(src_addr, size, (PROT_READ | PROT_WRITE), (MAP_SHARED | MAP_FIXED), memfd, dst_offset);
 	assert(ret == src_addr);
+	// free physical resources
+	unsigned src_offset = get_offset(src_addr);
+	int free_ret = fallocate(memfd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, src_offset, size);
+	assert(free_ret == 0);
 }
 
 void
