@@ -1713,6 +1713,14 @@ arena_dalloc_bin_locked_impl(tsdn_t *tsdn, arena_t *arena, bin_t *bin,
 	unsigned nfree = extent_nfree_get(slab);
 	if (nfree == bin_info->nregs) {
 		LOG("doronrk", "disosciating: %p", slab);
+		if (mesh_dst) {
+			// munmap is the wrong thing to do here, since that would 
+			// punch a hole in our memfd mapped region
+			// However, we can potentially help the kernel merge adjacent
+			// vma's by reseting the address to point to its original offset
+			// in the file.
+			pages_mesh_reset(extent_addr_get(slab), bin_info->slab_size);	
+		}
 		arena_dissociate_bin_slab(arena, slab, bin);
 		arena_dalloc_bin_slab(tsdn, arena, slab, bin);
 	} else if (nfree == 1 && slab != bin->slabcur) {

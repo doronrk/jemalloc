@@ -216,13 +216,15 @@ pages_mesh(void *src_addr, void *dst_addr, size_t size)
 {
 	assert(((uintptr_t)src_addr & PAGE_MASK) == 0);
 	assert(((uintptr_t)dst_addr & PAGE_MASK) == 0);
-	unsigned dst_offset = get_offset(dst_addr);;
+	unsigned dst_offset = get_offset(dst_addr);
 	void *ret = mmap(src_addr, size, (PROT_READ | PROT_WRITE), (MAP_SHARED | MAP_FIXED), memfd, dst_offset);
-	
-	LOG("doronrk", "src_addr: %p \t ret: %p, size: %lu, dst_offset: %u", src_addr, ret, size, dst_offset);
+	assert(ret == src_addr);
+}
 
-	LOG("doronrk", "errrno: %d", errno);
-
+void
+pages_mesh_reset(void *src_addr, size_t size) {
+	unsigned offset = get_offset(src_addr);
+	void *ret = mmap(src_addr, size, (PROT_READ | PROT_WRITE), (MAP_SHARED | MAP_FIXED), memfd, offset);
 	assert(ret == src_addr);
 }
 
@@ -683,6 +685,7 @@ pages_boot(void) {
 	 */
 #else
 	memfd = syscall(__NR_memfd_create, "jemalloc_memfd", MFD_CLOEXEC);
+	// TODO doronrk is this necessary?
 	int trunc_ret = ftruncate(memfd, mem_size);
 	if (trunc_ret) {
 		LOG("doronrk", "trunc failed, errno: %d", errno);
