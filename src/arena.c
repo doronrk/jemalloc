@@ -1004,7 +1004,7 @@ arena_bin_slabs_nonfull_insert(bin_t *bin, extent_t *slab) {
 	extent_heap_insert(&bin->slabs_nonfull, slab);
 }
 
-static void
+void
 arena_bin_slabs_nonfull_remove(bin_t *bin, extent_t *slab) {
 	extent_heap_remove(&bin->slabs_nonfull, slab);
 }
@@ -1021,7 +1021,7 @@ arena_bin_slabs_nonfull_tryget(bin_t *bin) {
 	return slab;
 }
 
-static void
+void
 arena_bin_slabs_full_insert(arena_t *arena, bin_t *bin, extent_t *slab) {
 	assert(extent_nfree_get(slab) == 0);
 	/*

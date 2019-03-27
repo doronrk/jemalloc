@@ -2,9 +2,11 @@
 #include "jemalloc/internal/jemalloc_preamble.h"
 #include "jemalloc/internal/jemalloc_internal_includes.h"
 
+#include "jemalloc/internal/log.h"
 #include "jemalloc/internal/assert.h"
 #include "jemalloc/internal/extent_dss.h"
 #include "jemalloc/internal/extent_mmap.h"
+#include "jemalloc/internal/pages.h"
 #include "jemalloc/internal/ph.h"
 #include "jemalloc/internal/rtree.h"
 #include "jemalloc/internal/mutex.h"
@@ -2266,6 +2268,43 @@ extent_merge_wrapper(tsdn_t *tsdn, arena_t *arena,
     extent_hooks_t **r_extent_hooks, extent_t *a, extent_t *b) {
 	return extent_merge_impl(tsdn, arena, r_extent_hooks, a, b, false);
 }
+
+
+bool
+extent_mesh(arena_t *arena, bin_t *bin, bin_info_t *bin_info, extent_t *src, extent_t *dst) {
+	arena_slab_data_t *slab_data_src = extent_slab_data_get(src);
+	arena_slab_data_t *slab_data_dst = extent_slab_data_get(dst);
+	bitmap_info_t *bm_info = &bin_info->bitmap_info;
+	for (size_t i = 0; i < bm_info->nbits; i++) {
+		if (bitmap_get(slab_data_src->bitmap, bm_info, i) && bitmap_get(slab_data_dst->bitmap, bm_info, i)) {
+			LOG("doronrk", "cannot mesh, both have alloc region: %lu", i);	
+			return false;
+		}
+	}	
+	for (size_t i = 0; i < bm_info->nbits; i++) {
+		// update extent_nfree_get ret value? 
+		if (bitmap_get(slab_data_src->bitmap, bm_info, i)) {
+			LOG("doronrk", "extent_addr_get(src): %p, extent_addr_get(dst): %p, i: %lu, reg_size: %lu", extent_addr_get(src), extent_addr_get(dst), i, bin_info->reg_size);  
+			void *src_region = extent_addr_get(src) + (i * bin_info->reg_size);
+			void *dst_region = extent_addr_get(dst) + (i * bin_info->reg_size);
+			memcpy(dst_region, src_region, bin_info->reg_size);
+			bitmap_set(slab_data_dst->bitmap, bm_info, i);
+			extent_nfree_dec(dst);	
+		}
+	}
+
+	pages_mesh(extent_addr_get(src), extent_addr_get(dst), bin_info->slab_size);
+
+	src->mesh_dst = dst;
+	if (extent_nfree_get(dst) == 0) {
+		LOG("doronrk", "dst is now full");
+		arena_bin_slabs_nonfull_remove(bin, dst);
+		arena_bin_slabs_full_insert(arena, bin, dst);
+	}
+	LOG("doronrk", "successfully meshed %p -> %p", extent_addr_get(src), extent_addr_get(dst));
+	return true;
+}
+
 
 bool
 extent_boot(void) {

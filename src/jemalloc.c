@@ -5,6 +5,7 @@
 #include "jemalloc/internal/assert.h"
 #include "jemalloc/internal/atomic.h"
 #include "jemalloc/internal/ctl.h"
+#include "jemalloc/internal/extent_externs.h"
 #include "jemalloc/internal/extent_dss.h"
 #include "jemalloc/internal/extent_mmap.h"
 #include "jemalloc/internal/hook.h"
@@ -3649,26 +3650,34 @@ void doronrk_print_extent(extent_t* extent, int depth) {
 	LOG("doronrk", "depth: %d, extent: %p, eaddr: %p, nfree: %d, nbits: %d, bitmap: %s", depth, extent, extent->e_addr, nfree, bitmap_info->nbits, buf);
 }
 
-void doronrk_nonfull_extents(extent_t* extent, int depth) {
-	if (extent == NULL) {
+void doronrk_nonfull_extents(extent_t* extent, int depth, extent_t **buf, size_t* cursor, size_t buflen) {
+	if (extent == NULL || *cursor >= buflen) {
 		return;
 	}
 	extent_t* leftmost_child, *sibling;
-	doronrk_print_extent(extent, depth);
-
+	buf[*cursor] = extent;
+	*cursor = *cursor + 1;
+	//doronrk_print_extent(extent, depth);
+	if (*cursor >= buflen - 1) {
+		return;
+	}
 	leftmost_child = phn_lchild_get(extent_t, ph_link, extent);
-	doronrk_nonfull_extents(leftmost_child, depth + 1);
+	doronrk_nonfull_extents(leftmost_child, depth + 1, buf, cursor, buflen);
 	
 	if (leftmost_child == NULL) {
 		return;
 	}
 	for (sibling = phn_next_get(extent_t, ph_link, leftmost_child); sibling !=
 		NULL; sibling = phn_next_get(extent_t, ph_link, sibling)) {
-		doronrk_nonfull_extents(sibling, depth+1);
+		doronrk_nonfull_extents(sibling, depth+1, buf, cursor, buflen);
 	}
 }
 
-void doronrk_mesh_bin(bin_t* bin) {
+void doronrk_mesh_bin(arena_t* arena, bin_t* bin, bin_info_t* bin_info) {
+	extent_t *mesh_candidates[100];
+	size_t mesh_candidate_cursor = 0;
+	
+
 	LOG("doronrk", "bin: %p", bin);
 	LOG("doronrk", "slabcur: %p", bin->slabcur);
 	if (bin->slabcur != NULL) {
@@ -3683,20 +3692,35 @@ void doronrk_mesh_bin(bin_t* bin) {
 		LOG("doronrk", "nonfull root is null");
 	} else {
 		LOG("doronrk", "nonfull root is NOT null");
-		doronrk_nonfull_extents(slabs_nonfull->ph_root, 0);
+		doronrk_nonfull_extents(slabs_nonfull->ph_root, 0, mesh_candidates, &mesh_candidate_cursor, 100);
 		for (auxelm = phn_next_get(extent_t, ph_link, slabs_nonfull->ph_root); auxelm != NULL;
 		    auxelm = phn_next_get(extent_t, ph_link, auxelm)) {
-			doronrk_nonfull_extents(auxelm, 0);
+			doronrk_nonfull_extents(auxelm, 0, mesh_candidates, &mesh_candidate_cursor, 100);
 		}
 	}
 
-	// Visit full extents
+	LOG("doronrk", "cursor: %lu", mesh_candidate_cursor);	
+
+	/*
+	for (size_t i = 0; i < mesh_candidate_cursor; i++) {
+		
+		doronrk_print_extent(mesh_candidates[i], i);
+	}	
+	*/
+	LOG("doronrk", "will try meshing the following two extents", 0);
+	
+	doronrk_print_extent(mesh_candidates[1], 0); 	
+	doronrk_print_extent(mesh_candidates[2], 0); 	
+
+	extent_mesh(arena, bin, bin_info, mesh_candidates[1], mesh_candidates[2]);
 }
 
 void doronrk_mesh_arena(arena_t* arena, tcache_t* tcache) {
 	LOG("doronrk", "arena: %p", arena);
 	unsigned i, j;
-	for (i = 0; i < SC_NBINS; i++) {
+	//for (i = 0; i < SC_NBINS; i++) {
+
+	for (i = 24; i < 25; i++) {
 		bin_info_t* bin_info = &bin_infos[i];
 		cache_bin_t* cache_bin = &tcache->bins_small[i];
 		LOG("doronrk", "bin_info->reg_size: %d", bin_info->reg_size);
@@ -3710,7 +3734,7 @@ void doronrk_mesh_arena(arena_t* arena, tcache_t* tcache) {
 		bins_t* bins = &arena->bins[i];
 		for (j = 0; j < bin_info->n_shards; j++) {
 			bin_t* bin = &bins->bin_shards[j];
-			doronrk_mesh_bin(bin);
+			doronrk_mesh_bin(arena, bin, bin_info);
 		}
 		LOG("doronrk", "\n");
 	}

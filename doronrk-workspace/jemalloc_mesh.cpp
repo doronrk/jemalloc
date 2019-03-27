@@ -38,8 +38,6 @@ void mesh_test() {
 }
 
 void flush() {
-	void* singleptr = malloc(2048);
-	free(singleptr);
 
 	int num = 11;
 	std::vector<void*> ptrs;
@@ -52,6 +50,9 @@ void flush() {
 	});
 	
 	talloc.join();
+	
+	void* singleptr = malloc(2048);
+	free(singleptr);
 
 
 	for (int i = 0; i < 11; i++) {
@@ -64,18 +65,32 @@ void allocate_some() {
 	void *ptrs[100];
 	for (int i = 0; i < 100; i++) {
 		ptrs[i] = malloc(2048);
+		std::cout << "ptrs[ " << i << "]: " << ptrs[i] << std::endl;
+		int *dst = (int*)ptrs[i];
+		dst[0] = i;
 	}
 	for (int i = 0; i < 50; i++) {
 		free(ptrs[i * 2 + i % 2]);
+		std::cout << "Freeing: " << ptrs[i * 2 + i % 2] << std::endl;
+	}
+	for (int i = 0; i < 50; i++) {
+		int index = i * 2 + ((i + 1) % 2);
+		int *dst = (int*)ptrs[index];
+		assert(dst[0] == index);	
 	}
 	doronrk_mesh();
+	for (int i = 0; i < 50; i++) {
+		int index = i * 2 + ((i + 1) % 2);
+		int *dst = (int*)ptrs[index];
+		assert(dst[0] == index);	
+	}
 	for (int i = 0; i < 50; i++) {
 		free(ptrs[i * 2 + ((i + 1) % 2)]);
 	}
 }
 
 int main(int argc, char** argv) {
-	mesh_test();
+	allocate_some();
 	std::cout << "ran the program" << std::endl;
 	
 	return 0;

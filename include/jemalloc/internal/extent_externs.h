@@ -71,6 +71,7 @@ extent_t *extent_split_wrapper(tsdn_t *tsdn, arena_t *arena,
     szind_t szind_a, bool slab_a, size_t size_b, szind_t szind_b, bool slab_b);
 bool extent_merge_wrapper(tsdn_t *tsdn, arena_t *arena,
     extent_hooks_t **r_extent_hooks, extent_t *a, extent_t *b);
+bool extent_mesh(arena_t *arena, bin_t *bin, bin_info_t *bin_info, extent_t *src, extent_t *dst);
 
 bool extent_boot(void);
 

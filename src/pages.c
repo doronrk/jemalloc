@@ -1,4 +1,6 @@
 #define JEMALLOC_PAGES_C_
+
+#include <linux/memfd.h>
 #include "jemalloc/internal/jemalloc_preamble.h"
 
 #include "jemalloc/internal/pages.h"
@@ -195,6 +197,31 @@ pages_map_slow(size_t size, size_t alignment, bool *commit) {
 	assert(ret != NULL);
 	assert(PAGE_ADDR2BASE(ret) == ret);
 	return ret;
+}
+
+static unsigned 
+get_offset(void *a) {
+	uintptr_t addr = (uintptr_t) a;
+	uintptr_t base = (uintptr_t) mem_base;
+	assert(addr >= base);
+	assert(addr < base + mem_size);
+	unsigned ret = (addr - base);
+	return ret;
+}
+
+void
+pages_mesh(void *src_addr, void *dst_addr, size_t size)
+{
+	assert(((uintptr_t)src_addr & PAGE_MASK) == 0);
+	assert(((uintptr_t)dst_addr & PAGE_MASK) == 0);
+	unsigned dst_offset = get_offset(dst_addr);;
+	void *ret = mmap(src_addr, size, (PROT_READ | PROT_WRITE), (MAP_SHARED | MAP_FIXED), memfd, dst_offset);
+	
+	LOG("doronrk", "src_addr: %p \t ret: %p, size: %lu, dst_offset: %u", src_addr, ret, size, dst_offset);
+
+	LOG("doronrk", "errrno: %d", errno);
+
+	assert(ret == src_addr);
 }
 
 void *
@@ -652,8 +679,14 @@ pages_boot(void) {
 	 * FreeBSD doesn't need the check; madvise(2) is known to work.
 	 */
 #else
-	memfd = syscall(__NR_memfd_create, "jemalloc_memfd", 0);
-	mem_base = mmap(NULL, mem_size, (PROT_READ | PROT_WRITE), mmap_flags, memfd, 0);
+	memfd = syscall(__NR_memfd_create, "jemalloc_memfd", MFD_CLOEXEC);
+	int trunc_ret = ftruncate(memfd, mem_size);
+	if (trunc_ret) {
+		LOG("doronrk", "trunc failed, errno: %d", errno);
+	}
+	LOG("doronrk", "memfd: %d", memfd);
+	mem_base = mmap(NULL, mem_size, (PROT_READ | PROT_WRITE), (MAP_SHARED), memfd, 0);
+	LOG("doronrk", "errno: %d", errno);
 	LOG("doronrk", "mem_base: %p", mem_base);
 	//LOG("doronrk", "memfd: %d, memfd_offset: %d", memfd, atomic_load_u(&memfd_offset, ATOMIC_RELAXED));;
 	/* Detect lazy purge runtime support. */
