@@ -1048,6 +1048,19 @@ arena_bin_slabs_meshed_insert(arena_t *arena, bin_t *bin, extent_t *slab) {
 	extent_list_append(&bin->slabs_meshed, slab);
 }
 
+void
+arena_bin_slabs_meshed_remove(arena_t *arena, bin_t *bin, extent_t *slab) {
+	/*
+	 *  Tracking extents is required by arena_reset, which is not allowed
+	 *  for auto arenas.  Bypass this step to avoid touching the extent
+	 *  linkage (often results in cache misses) for auto arenas.
+	 */
+	if (arena_is_auto(arena)) {
+		return;
+	}
+	extent_list_remove(&bin->slabs_meshed, slab);
+}
+
 static void
 arena_bin_slabs_full_remove(arena_t *arena, bin_t *bin, extent_t *slab) {
 	if (arena_is_auto(arena)) {
@@ -1623,7 +1636,9 @@ arena_dissociate_bin_slab(arena_t *arena, extent_t *slab, bin_t *bin) {
 		// Answer: because just prior in the only callsite of this function
 		// nfree was just incrememted from 0 to 1, so you know this extent
 		// has been previously sitting in full list.
-		if (bin_info->nregs == 1) {
+		if (extent_mesh_dst_get(slab) != NULL) {
+			arena_bin_slabs_meshed_remove(arena, bin, slab);
+		} else if (bin_info->nregs == 1) {
 			arena_bin_slabs_full_remove(arena, bin, slab);
 		} else {
 			arena_bin_slabs_nonfull_remove(bin, slab);
@@ -1673,6 +1688,7 @@ arena_bin_lower_slab(tsdn_t *tsdn, arena_t *arena, extent_t *slab,
 	}
 }
 
+
 static void
 arena_dalloc_bin_locked_impl(tsdn_t *tsdn, arena_t *arena, bin_t *bin,
     szind_t binind, extent_t *slab, void *ptr, bool junked) {
@@ -1683,17 +1699,22 @@ arena_dalloc_bin_locked_impl(tsdn_t *tsdn, arena_t *arena, bin_t *bin,
 		arena_dalloc_junk_small(ptr, bin_info);
 	}
 
+	extent_t *mesh_dst = extent_mesh_dst_get(slab);
+	if (mesh_dst) {
+		assert(extent_mesh_dst_get(mesh_dst) == NULL);
+		size_t diff = (size_t)((uintptr_t)ptr - (uintptr_t)extent_addr_get(slab));
+		void *dst_ptr = (void*)(uintptr_t)extent_addr_get(mesh_dst) + diff;
+		// TODO doronrk: will this be optimized as tail call as is? 
+		arena_dalloc_bin_locked_impl(tsdn, arena, bin, binind, mesh_dst, dst_ptr, true);
+	}
 	
-	// TODO doronrk: mesh stuff here	
 	arena_slab_reg_dalloc(slab, slab_data, ptr);
 	unsigned nfree = extent_nfree_get(slab);
-	//LOG("doronrk", "extent addr: %p, ptr: %p, nfree: %d", slab->e_addr, ptr, nfree); 
 	if (nfree == bin_info->nregs) {
-		//LOG("doronrk", "full case");
 		arena_dissociate_bin_slab(arena, slab, bin);
 		arena_dalloc_bin_slab(tsdn, arena, slab, bin);
 	} else if (nfree == 1 && slab != bin->slabcur) {
-		//LOG("doronrk", "lower slab case");
+		assert(extent_mesh_dst_get(slab) == NULL);
 		arena_bin_slabs_full_remove(arena, bin, slab);
 		arena_bin_lower_slab(tsdn, arena, slab, bin);
 	}

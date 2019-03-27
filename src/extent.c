@@ -574,6 +574,7 @@ extents_dalloc(tsdn_t *tsdn, arena_t *arena, extent_hooks_t **r_extent_hooks,
 
 	extent_addr_set(extent, extent_base_get(extent));
 	extent_zeroed_set(extent, false);
+	extent_mesh_dst_set(extent, NULL);
 
 	extent_record(tsdn, arena, r_extent_hooks, extents, extent, false);
 }

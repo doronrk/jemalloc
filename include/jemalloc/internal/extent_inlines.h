@@ -9,6 +9,17 @@
 #include "jemalloc/internal/sc.h"
 #include "jemalloc/internal/sz.h"
 
+static inline extent_t *
+extent_mesh_dst_get(extent_t *extent) {
+	return extent->mesh_dst;
+}
+
+static inline void
+extent_mesh_dst_set(extent_t *extent, extent_t *dst) {
+	assert(dst == NULL || dst->mesh_dst == NULL);
+	extent->mesh_dst = dst;
+}
+
 static inline void
 extent_lock(tsdn_t *tsdn, extent_t *extent) {
 	assert(extent != NULL);
