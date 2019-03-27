@@ -91,7 +91,7 @@ os_pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
 	{
 		int prot = *commit ? PAGES_PROT_COMMIT : PAGES_PROT_DECOMMIT;
 		assert((size & PAGE_MASK) == 0);
-		if (addr == NULL && memfd > 0) {
+		if (addr == NULL && memfd > 0 && size <= SC_SMALL_MAXCLASS) {
 			unsigned offset = atomic_fetch_add_u(&memfd_offset, size >> LG_PAGE, ATOMIC_RELAXED);
 			ret = mem_base + (offset << LG_PAGE);
 			assert(ret >= mem_base && ret < mem_base + mem_size);
