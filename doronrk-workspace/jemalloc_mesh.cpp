@@ -84,7 +84,7 @@ void allocate_some() {
 		int *dst = (int*)ptrs[index];
 		assert(dst[0] == index);	
 	}
-	for (int i = 0; i < 50; i++) {
+	for (int i = 49; i >= 0; i--) {
 		free(ptrs[i * 2 + ((i + 1) % 2)]);
 	}
 }

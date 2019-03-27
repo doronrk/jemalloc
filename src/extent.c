@@ -1219,7 +1219,7 @@ extent_alloc_core(tsdn_t *tsdn, arena_t *arena, void *new_addr, size_t size,
 	*/
 
 	/* mmap. */
-	if ((ret = extent_alloc_mmap(new_addr, size, alignment, zero, commit))
+	if ((ret = extent_alloc_mmap(new_addr, size, alignment, zero, commit, true))
 	    != NULL) {
 		return ret;
 	}

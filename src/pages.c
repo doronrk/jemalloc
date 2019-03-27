@@ -66,7 +66,7 @@ static void os_pages_unmap(void *addr, size_t size);
 /******************************************************************************/
 
 static void *
-os_pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
+os_pages_map(void *addr, size_t size, size_t alignment, bool *commit, bool for_slab) {
 	assert(ALIGNMENT_ADDR2BASE(addr, os_page) == addr);
 	assert(ALIGNMENT_CEILING(size, os_page) == size);
 	assert(size != 0);
@@ -91,11 +91,12 @@ os_pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
 	{
 		int prot = *commit ? PAGES_PROT_COMMIT : PAGES_PROT_DECOMMIT;
 		assert((size & PAGE_MASK) == 0);
-		if (addr == NULL && memfd > 0 && size <= SC_SMALL_MAXCLASS) {
+		if (addr == NULL && memfd > 0 && for_slab) {
 			unsigned offset = atomic_fetch_add_u(&memfd_offset, size >> LG_PAGE, ATOMIC_RELAXED);
 			ret = mem_base + (offset << LG_PAGE);
 			assert(ret >= mem_base && ret < mem_base + mem_size);
 			LOG("doronrk", "size: %lu\t\tret: %p\t\toffset: %u\t\tmemfd: %d", size, ret, offset, memfd); 
+			*commit = false; // TODO doronrk
 		} else {
 			ret = mmap(addr, size, prot, mmap_flags, -1, 0);
 			LOG("doronrk", "anon mapping");
@@ -176,7 +177,7 @@ os_pages_unmap(void *addr, size_t size) {
 }
 
 static void *
-pages_map_slow(size_t size, size_t alignment, bool *commit) {
+pages_map_slow(size_t size, size_t alignment, bool *commit, bool for_slab) {
 	size_t alloc_size = size + alignment - os_page;
 	/* Beware size_t wrap-around. */
 	if (alloc_size < size) {
@@ -185,7 +186,7 @@ pages_map_slow(size_t size, size_t alignment, bool *commit) {
 
 	void *ret;
 	do {
-		void *pages = os_pages_map(NULL, alloc_size, alignment, commit);
+		void *pages = os_pages_map(NULL, alloc_size, alignment, commit, for_slab);
 		if (pages == NULL) {
 			return NULL;
 		}
@@ -203,6 +204,7 @@ static unsigned
 get_offset(void *a) {
 	uintptr_t addr = (uintptr_t) a;
 	uintptr_t base = (uintptr_t) mem_base;
+	LOG("doronrk", "a: %p \t mem_base: %p", a, mem_base);
 	assert(addr >= base);
 	assert(addr < base + mem_size);
 	unsigned ret = (addr - base);
@@ -224,8 +226,9 @@ pages_mesh(void *src_addr, void *dst_addr, size_t size)
 	assert(ret == src_addr);
 }
 
+
 void *
-pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
+pages_map(void *addr, size_t size, size_t alignment, bool *commit, bool for_slab) {
 	assert(alignment >= PAGE);
 	assert(ALIGNMENT_ADDR2BASE(addr, alignment) == addr);
 
@@ -272,14 +275,14 @@ pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
 	 * approach works most of the time.
 	 */
 
-	void *ret = os_pages_map(addr, size, os_page, commit);
+	void *ret = os_pages_map(addr, size, os_page, commit, for_slab);
 	if (ret == NULL || ret == addr) {
 		return ret;
 	}
 	assert(addr == NULL);
 	if (ALIGNMENT_ADDR2OFFSET(ret, alignment) != 0) {
 		os_pages_unmap(ret, size);
-		return pages_map_slow(size, alignment, commit);
+		return pages_map_slow(size, alignment, commit, for_slab);
 	}
 
 	assert(PAGE_ADDR2BASE(ret) == ret);
@@ -692,7 +695,7 @@ pages_boot(void) {
 	/* Detect lazy purge runtime support. */
 	if (pages_can_purge_lazy) {
 		bool committed = false;
-		void *madv_free_page = os_pages_map(NULL, PAGE, PAGE, &committed);
+		void *madv_free_page = os_pages_map(NULL, PAGE, PAGE, &committed, false);
 		if (madv_free_page == NULL) {
 			return true;
 		}

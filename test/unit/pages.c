@@ -7,7 +7,7 @@ TEST_BEGIN(test_pages_huge) {
 
 	alloc_size = HUGEPAGE * 2 - PAGE;
 	commit = true;
-	pages = pages_map(NULL, alloc_size, PAGE, &commit);
+	pages = pages_map(NULL, alloc_size, PAGE, &commit, false);
 	assert_ptr_not_null(pages, "Unexpected pages_map() error");
 
 	if (init_system_thp_mode == thp_mode_default) {

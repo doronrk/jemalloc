@@ -104,6 +104,7 @@ extent_state_get(const extent_t *extent) {
 
 static inline bool
 extent_zeroed_get(const extent_t *extent) {
+	//return false;
 	return (bool)((extent->e_bits & EXTENT_BITS_ZEROED_MASK) >>
 	    EXTENT_BITS_ZEROED_SHIFT);
 }

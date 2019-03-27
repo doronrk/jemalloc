@@ -38,7 +38,7 @@ base_map(tsdn_t *tsdn, extent_hooks_t *extent_hooks, unsigned ind, size_t size) 
 	assert(size == HUGEPAGE_CEILING(size));
 	size_t alignment = HUGEPAGE;
 	if (extent_hooks == &extent_hooks_default) {
-		addr = extent_alloc_mmap(NULL, size, alignment, &zero, &commit);
+		addr = extent_alloc_mmap(NULL, size, alignment, &zero, &commit, false);
 	} else {
 		/* No arena context as we are creating new arenas. */
 		tsd_t *tsd = tsdn_null(tsdn) ? tsd_fetch() : tsdn_tsd(tsdn);
