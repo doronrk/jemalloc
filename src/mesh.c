@@ -77,8 +77,14 @@ mesh_mesh() {
 	}		
 }
 
+JEMALLOC_EXPORT void
+je_mesh() {
+	LOG("doronrk", "you found me");
+//	mesh_mesh();
+}
+
+
 void
 mesh_boot(void) {
 	LOG("doronrk", "mesh boot y'all");
-	mesh_arena(NULL);
 }

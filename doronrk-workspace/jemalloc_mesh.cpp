@@ -91,6 +91,6 @@ void allocate_some() {
 */
 int main(int argc, char** argv) {
 	std::cout << "ran the program" << std::endl;
-	
+	mesh();	
 	return 0;
 }
