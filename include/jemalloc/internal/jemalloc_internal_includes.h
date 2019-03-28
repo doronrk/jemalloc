@@ -64,6 +64,7 @@
 
 #include "jemalloc/internal/jemalloc_internal_externs.h"
 #include "jemalloc/internal/extent_externs.h"
+#include "jemalloc/internal/mesh_externs.h"
 #include "jemalloc/internal/base_externs.h"
 #include "jemalloc/internal/arena_externs.h"
 #include "jemalloc/internal/large_externs.h"

@@ -1438,6 +1438,8 @@ malloc_init_hard_a0_locked() {
 	sz_boot(&sc_data);
 	bin_boot(&sc_data, bin_shard_sizes);
 
+	mesh_boot();
+	
 	if (opt_stats_print) {
 		/* Print statistics at exit. */
 		if (atexit(stats_print_atexit) != 0) {
