@@ -60,25 +60,25 @@ void flush() {
 	}
 	doronrk_mesh();
 }
-
+*/
 void allocate_some() {
 	void *ptrs[100];
 	for (int i = 0; i < 100; i++) {
 		ptrs[i] = malloc(2048);
-		std::cout << "ptrs[ " << i << "]: " << ptrs[i] << std::endl;
+		//std::cout << "ptrs[ " << i << "]: " << ptrs[i] << std::endl;
 		int *dst = (int*)ptrs[i];
 		dst[0] = i;
 	}
 	for (int i = 0; i < 50; i++) {
 		free(ptrs[i * 2 + i % 2]);
-		std::cout << "Freeing: " << ptrs[i * 2 + i % 2] << std::endl;
+		//std::cout << "Freeing: " << ptrs[i * 2 + i % 2] << std::endl;
 	}
 	for (int i = 0; i < 50; i++) {
 		int index = i * 2 + ((i + 1) % 2);
 		int *dst = (int*)ptrs[index];
 		assert(dst[0] == index);	
 	}
-	doronrk_mesh();
+	mesh();
 	for (int i = 0; i < 50; i++) {
 		int index = i * 2 + ((i + 1) % 2);
 		int *dst = (int*)ptrs[index];
@@ -88,9 +88,8 @@ void allocate_some() {
 		free(ptrs[i * 2 + ((i + 1) % 2)]);
 	}
 }
-*/
 int main(int argc, char** argv) {
+	allocate_some();
 	std::cout << "ran the program" << std::endl;
-	mesh();	
 	return 0;
 }

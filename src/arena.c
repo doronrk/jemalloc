@@ -10,6 +10,8 @@
 #include "jemalloc/internal/rtree.h"
 #include "jemalloc/internal/util.h"
 
+#include "jemalloc/internal/log.h"
+
 JEMALLOC_DIAGNOSTIC_DISABLE_SPURIOUS
 
 /******************************************************************************/
@@ -1000,11 +1002,13 @@ arena_slab_dalloc(tsdn_t *tsdn, arena_t *arena, extent_t *slab) {
 static void
 arena_bin_slabs_nonfull_insert(bin_t *bin, extent_t *slab) {
 	assert(extent_nfree_get(slab) > 0);
+	//LOG("mesh", "extent_heap_insert");
 	extent_heap_insert(&bin->slabs_nonfull, slab);
 }
 
 static void
 arena_bin_slabs_nonfull_remove(bin_t *bin, extent_t *slab) {
+	//LOG("mesh", "extent_heap_remove");
 	extent_heap_remove(&bin->slabs_nonfull, slab);
 }
 
