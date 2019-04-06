@@ -1236,6 +1236,7 @@ malloc_conf_init(sc_data_t *sc_data, unsigned bin_shard_sizes[SC_NBINS]) {
 				CONF_HANDLE_BOOL(opt_xmalloc, "xmalloc")
 			}
 			CONF_HANDLE_BOOL(opt_tcache, "tcache")
+			CONF_HANDLE_BOOL(opt_mesh, "mesh")
 			CONF_HANDLE_SSIZE_T(opt_lg_tcache_max, "lg_tcache_max",
 			    -1, (sizeof(size_t) << 3) - 1)
 
@@ -1471,6 +1472,7 @@ malloc_init_hard_a0_locked() {
 		return true;
 	}
 	hook_boot();
+	LOG("mesh", "opt_mesh: %d", opt_mesh);
 	/*
 	 * Create enough scaffolding to allow recursive allocation in
 	 * malloc_ncpus().

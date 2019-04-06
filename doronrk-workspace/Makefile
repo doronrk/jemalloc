@@ -5,7 +5,7 @@ jemalloc_mesh:
 	$(CC) $(CFLAGS) -o build/jemalloc_mesh -L`jemalloc-config --libdir` -Wl,-rpath,`jemalloc-config --libdir` -ljemalloc `jemalloc-config --libs` jemalloc_mesh.cpp 
 
 run:
-	MALLOC_CONF="log:mesh" ./build/jemalloc_mesh
+	MALLOC_CONF="log:mesh,mesh:true" ./build/jemalloc_mesh
 	#MALLOC_CONF="log:$(log)" ./build/jemalloc_mesh
 
 gdb:
