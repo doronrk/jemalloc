@@ -5,7 +5,6 @@
 #include <thread>
 #include <vector>
 #include <cassert>
-/*
 void mesh_test() {
 	void* mem1a = malloc(2048);
 	void* mem1b = malloc(2048);
@@ -36,6 +35,7 @@ void mesh_test() {
 	free(mem1a);
 	free(mem2b);
 }
+/*
 
 void flush() {
 
@@ -89,7 +89,7 @@ void allocate_some() {
 	}
 }
 int main(int argc, char** argv) {
-	allocate_some();
+	mesh_test();
 	std::cout << "ran the program" << std::endl;
 	return 0;
 }

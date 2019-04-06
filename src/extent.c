@@ -5,6 +5,7 @@
 #include "jemalloc/internal/assert.h"
 #include "jemalloc/internal/extent_dss.h"
 #include "jemalloc/internal/extent_mmap.h"
+#include "jemalloc/internal/mesh.h"
 #include "jemalloc/internal/ph.h"
 #include "jemalloc/internal/rtree.h"
 #include "jemalloc/internal/mutex.h"
@@ -1207,6 +1208,11 @@ extent_alloc_core(tsdn_t *tsdn, arena_t *arena, void *new_addr, size_t size,
 	assert(size != 0);
 	assert(alignment != 0);
 
+	if (opt_mesh) {
+		assert(mesh_is_booted());
+		return mesh_extent_alloc(new_addr, size, alignment, zero, commit);
+	}
+
 	/* "primary" dss. */
 	if (have_dss && dss_prec == dss_prec_primary && (ret =
 	    extent_alloc_dss(tsdn, arena, new_addr, size, alignment, zero,
@@ -1860,7 +1866,9 @@ extent_dalloc_wrapper(tsdn_t *tsdn, arena_t *arena,
 
 static void
 extent_destroy_default_impl(void *addr, size_t size) {
-	if (!have_dss || !extent_in_dss(addr)) {
+	if (opt_mesh && mesh_extent_in_meshable_area(addr, size)) {
+		mesh_extent_destroy(addr, size);
+	} else if (!have_dss || !extent_in_dss(addr)) {
 		pages_unmap(addr, size);
 	}
 }

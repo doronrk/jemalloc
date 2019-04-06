@@ -11,6 +11,7 @@
 #include "jemalloc/internal/jemalloc_internal_types.h"
 #include "jemalloc/internal/log.h"
 #include "jemalloc/internal/malloc_io.h"
+#include "jemalloc/internal/mesh.h"
 #include "jemalloc/internal/mutex.h"
 #include "jemalloc/internal/rtree.h"
 #include "jemalloc/internal/sc.h"
@@ -1472,7 +1473,11 @@ malloc_init_hard_a0_locked() {
 		return true;
 	}
 	hook_boot();
-	LOG("mesh", "opt_mesh: %d", opt_mesh);
+	if (opt_mesh) {
+		if (mesh_boot()) {
+			return true;
+		}
+	}
 	/*
 	 * Create enough scaffolding to allow recursive allocation in
 	 * malloc_ncpus().
@@ -2175,19 +2180,25 @@ imalloc(static_opts_t *sopts, dynamic_opts_t *dopts) {
 	/* We always need the tsd.  Let's grab it right away. */
 	tsd_t *tsd = tsd_fetch();
 	assert(tsd);
+	int ret = 0;
 	if (likely(tsd_fast(tsd))) {
 		/* Fast and common path. */
 		tsd_assert_fast(tsd);
 		sopts->slow = false;
-		return imalloc_body(sopts, dopts, tsd);
+		ret = imalloc_body(sopts, dopts, tsd);
 	} else {
 		if (!tsd_get_allocates() && !imalloc_init_check(sopts, dopts)) {
 			return ENOMEM;
 		}
 
 		sopts->slow = true;
-		return imalloc_body(sopts, dopts, tsd);
+		ret = imalloc_body(sopts, dopts, tsd);
 	}
+	// TODO this can probably be removed at some point
+	if (!ret && opt_mesh && *dopts->result != NULL) {
+		assert(mesh_extent_in_meshable_area(*dopts->result, dopts->item_size));
+	}
+	return ret;
 }
 
 JEMALLOC_NOINLINE
@@ -3705,6 +3716,10 @@ _malloc_prefork(void)
 #endif
 	assert(malloc_initialized());
 
+	// mesh memory is mapped SHARED, so currently forking poses problems
+	// This can be fixed later though.
+	assert(!opt_mesh);
+
 	tsd = tsd_fetch();
 
 	narenas = narenas_total_get();
@@ -3713,6 +3728,9 @@ _malloc_prefork(void)
 	/* Acquire all mutexes in a safe order. */
 	ctl_prefork(tsd_tsdn(tsd));
 	tcache_prefork(tsd_tsdn(tsd));
+	if (opt_mesh) {
+		mesh_prefork(tsd_tsdn(tsd));
+	}
 	malloc_mutex_prefork(tsd_tsdn(tsd), &arenas_lock);
 	if (have_background_thread) {
 		background_thread_prefork0(tsd_tsdn(tsd));
@@ -3798,6 +3816,9 @@ _malloc_postfork(void)
 	malloc_mutex_postfork_parent(tsd_tsdn(tsd), &arenas_lock);
 	tcache_postfork_parent(tsd_tsdn(tsd));
 	ctl_postfork_parent(tsd_tsdn(tsd));
+	if (opt_mesh) {
+		mesh_postfork_parent(tsd_tsdn(tsd));
+	}
 }
 
 void
@@ -3827,6 +3848,9 @@ jemalloc_postfork_child(void) {
 	malloc_mutex_postfork_child(tsd_tsdn(tsd), &arenas_lock);
 	tcache_postfork_child(tsd_tsdn(tsd));
 	ctl_postfork_child(tsd_tsdn(tsd));
+	if (opt_mesh) {
+		mesh_postfork_child(tsd_tsdn(tsd));
+	}
 }
 
 /******************************************************************************/

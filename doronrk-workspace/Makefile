@@ -9,7 +9,7 @@ run:
 	#MALLOC_CONF="log:$(log)" ./build/jemalloc_mesh
 
 gdb:
-	MALLOC_CONF="log:$(log)" gdb ./build/jemalloc_mesh
+	MALLOC_CONF="log:$(log),mesh:true" gdb ./build/jemalloc_mesh
 
 jem:
 	cd ../ && make && make dist && sudo make install

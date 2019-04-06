@@ -7,6 +7,7 @@
 
 #include "jemalloc/internal/assert.h"
 #include "jemalloc/internal/malloc_io.h"
+#include "jemalloc/internal/mesh.h"
 
 #ifdef JEMALLOC_SYSCTL_VM_OVERCOMMIT
 #include <sys/sysctl.h>
@@ -26,7 +27,7 @@ static size_t	os_page;
 #  define PAGES_PROT_DECOMMIT (PROT_NONE)
 static int	mmap_flags;
 #endif
-static bool	os_overcommits;
+bool	os_overcommits;
 
 const char *thp_mode_names[] = {
 	"default",
@@ -305,9 +306,14 @@ pages_purge_lazy(void *addr, size_t size) {
 	}
 
 #ifdef _WIN32
+	// TODO a real way to express meshing not supported 
+	assert(!mesh_extent_in_meshable_area(addr, size));
 	VirtualAlloc(addr, size, MEM_RESET, PAGE_READWRITE);
 	return false;
 #elif defined(JEMALLOC_PURGE_MADVISE_FREE)
+	if (mesh_extent_in_meshable_area(addr, size)) {
+		return (mesh_extent_destroy(addr, size) != 0);
+	}
 	return (madvise(addr, size,
 #  ifdef MADV_FREE
 	    MADV_FREE
@@ -317,6 +323,9 @@ pages_purge_lazy(void *addr, size_t size) {
 	    ) != 0);
 #elif defined(JEMALLOC_PURGE_MADVISE_DONTNEED) && \
     !defined(JEMALLOC_PURGE_MADVISE_DONTNEED_ZEROS)
+	if (mesh_extent_in_meshable_area(addr, size)) {
+		return (mesh_extent_destroy(addr, size) != 0);
+	}
 	return (madvise(addr, size, MADV_DONTNEED) != 0);
 #else
 	not_reached();
@@ -334,9 +343,14 @@ pages_purge_forced(void *addr, size_t size) {
 
 #if defined(JEMALLOC_PURGE_MADVISE_DONTNEED) && \
     defined(JEMALLOC_PURGE_MADVISE_DONTNEED_ZEROS)
+	if (mesh_extent_in_meshable_area(addr, size)) {
+		return (mesh_extent_destroy(addr, size) != 0);
+	}
 	return (madvise(addr, size, MADV_DONTNEED) != 0);
 #elif defined(JEMALLOC_MAPS_COALESCE)
 	/* Try to overlay a new demand-zeroed mapping. */
+	// TODO this is probably not correct
+	assert(!mesh_extent_in_meshable_area(addr, size));
 	return pages_commit(addr, size);
 #else
 	not_reached();

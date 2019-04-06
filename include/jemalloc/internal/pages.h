@@ -43,6 +43,8 @@
 #  define PAGES_CAN_PURGE_FORCED
 #endif
 
+extern bool os_overcommits;
+
 static const bool pages_can_purge_lazy =
 #ifdef PAGES_CAN_PURGE_LAZY
     true

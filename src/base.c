@@ -4,6 +4,7 @@
 
 #include "jemalloc/internal/assert.h"
 #include "jemalloc/internal/extent_mmap.h"
+#include "jemalloc/internal/mesh.h"
 #include "jemalloc/internal/mutex.h"
 #include "jemalloc/internal/sz.h"
 
@@ -38,7 +39,12 @@ base_map(tsdn_t *tsdn, extent_hooks_t *extent_hooks, unsigned ind, size_t size) 
 	assert(size == HUGEPAGE_CEILING(size));
 	size_t alignment = HUGEPAGE;
 	if (extent_hooks == &extent_hooks_default) {
-		addr = extent_alloc_mmap(NULL, size, alignment, &zero, &commit);
+		// TODO mesh_is_booted is kind of a hack
+		if (opt_mesh && mesh_is_booted()) {
+			addr = mesh_extent_alloc(NULL, size, alignment, &zero, &commit);
+		} else {
+			addr = extent_alloc_mmap(NULL, size, alignment, &zero, &commit);
+		}
 	} else {
 		/* No arena context as we are creating new arenas. */
 		tsd_t *tsd = tsdn_null(tsdn) ? tsd_fetch() : tsdn_tsd(tsdn);

@@ -30,6 +30,7 @@ wait_for_child_exit(int pid) {
 
 TEST_BEGIN(test_fork) {
 #ifndef _WIN32
+	test_skip_if(opt_mesh);
 	void *p;
 	pid_t pid;
 
@@ -105,6 +106,7 @@ do_test_fork_multithreaded() {
 
 TEST_BEGIN(test_fork_multithreaded) {
 #ifndef _WIN32
+	test_skip_if(opt_mesh);
 	/*
 	 * We've seen bugs involving hanging on arenas_lock (though the same
 	 * class of bugs can happen on any mutex).  The bugs are intermittent
