@@ -256,28 +256,39 @@ arena_extents_dirty_dalloc(tsdn_t *tsdn, arena_t *arena,
 }
 
 static void *
-arena_slab_reg_alloc(extent_t *slab, const bin_info_t *bin_info) {
+arena_slab_reg_alloc(arena_t *arena, extent_t *slab, const bin_info_t *bin_info) {
 	void *ret;
 	arena_slab_data_t *slab_data = extent_slab_data_get(slab);
 	size_t regind;
 
 	assert(extent_nfree_get(slab) > 0);
 	assert(!bitmap_full(slab_data->bitmap, &bin_info->bitmap_info));
+	
+	if (opt_mesh && mesh_slab_is_candidate(slab) && extent_nfree_get(slab) != bin_info->nregs) {
+		mesh_slab_bitmap_invalidate(arena->mesh_arena_data, slab_data, bin_info, slab);
+	}
 
 	regind = bitmap_sfu(slab_data->bitmap, &bin_info->bitmap_info);
 	ret = (void *)((uintptr_t)extent_addr_get(slab) +
 	    (uintptr_t)(bin_info->reg_size * regind));
 	extent_nfree_dec(slab);
+	if (opt_mesh && mesh_slab_is_candidate(slab) && !bitmap_full(slab_data->bitmap, &bin_info->bitmap_info)) {
+		mesh_slab_bitmap_update(arena->mesh_arena_data, slab_data, bin_info, slab);
+	}
 	return ret;
 }
 
 static void
-arena_slab_reg_alloc_batch(extent_t *slab, const bin_info_t *bin_info,
+arena_slab_reg_alloc_batch(arena_t *arena, extent_t *slab, const bin_info_t *bin_info,
 			   unsigned cnt, void** ptrs) {
 	arena_slab_data_t *slab_data = extent_slab_data_get(slab);
 
 	assert(extent_nfree_get(slab) >= cnt);
 	assert(!bitmap_full(slab_data->bitmap, &bin_info->bitmap_info));
+	
+	if (opt_mesh && mesh_slab_is_candidate(slab) && extent_nfree_get(slab) != bin_info->nregs) {
+		mesh_slab_bitmap_invalidate(arena->mesh_arena_data, slab_data, bin_info, slab);
+	}
 
 #if (! defined JEMALLOC_INTERNAL_POPCOUNTL) || (defined BITMAP_USE_TREE)
 	for (unsigned i = 0; i < cnt; i++) {
@@ -317,6 +328,9 @@ arena_slab_reg_alloc_batch(extent_t *slab, const bin_info_t *bin_info,
 	}
 #endif
 	extent_nfree_sub(slab, cnt);
+	if (opt_mesh && mesh_slab_is_candidate(slab) && !bitmap_full(slab_data->bitmap, &bin_info->bitmap_info)) {
+		mesh_slab_bitmap_update(arena->mesh_arena_data, slab_data, bin_info, slab);
+	}
 }
 
 #ifndef JEMALLOC_JET
@@ -344,7 +358,7 @@ arena_slab_regind(extent_t *slab, szind_t binind, const void *ptr) {
 }
 
 static void
-arena_slab_reg_dalloc(extent_t *slab, arena_slab_data_t *slab_data, void *ptr) {
+arena_slab_reg_dalloc(arena_t *arena, extent_t *slab, arena_slab_data_t *slab_data, void *ptr) {
 	szind_t binind = extent_szind_get(slab);
 	const bin_info_t *bin_info = &bin_infos[binind];
 	size_t regind = arena_slab_regind(slab, binind, ptr);
@@ -352,9 +366,14 @@ arena_slab_reg_dalloc(extent_t *slab, arena_slab_data_t *slab_data, void *ptr) {
 	assert(extent_nfree_get(slab) < bin_info->nregs);
 	/* Freeing an unallocated pointer can cause assertion failure. */
 	assert(bitmap_get(slab_data->bitmap, &bin_info->bitmap_info, regind));
-
+	if (opt_mesh && mesh_slab_is_candidate(slab) && !bitmap_full(slab_data->bitmap, &bin_info->bitmap_info)) {
+		mesh_slab_bitmap_invalidate(arena->mesh_arena_data, slab_data, bin_info, slab);
+	}
 	bitmap_unset(slab_data->bitmap, &bin_info->bitmap_info, regind);
 	extent_nfree_inc(slab);
+	if (opt_mesh && mesh_slab_is_candidate(slab) && extent_nfree_get(slab) != bin_info->nregs) {
+		mesh_slab_bitmap_update(arena->mesh_arena_data, slab_data, bin_info, slab);
+	}
 }
 
 static void
@@ -1304,7 +1323,7 @@ arena_bin_malloc_hard(tsdn_t *tsdn, arena_t *arena, bin_t *bin,
 		 * bin lock in arena_bin_nonfull_slab_get().
 		 */
 		if (extent_nfree_get(bin->slabcur) > 0) {
-			void *ret = arena_slab_reg_alloc(bin->slabcur,
+			void *ret = arena_slab_reg_alloc(arena, bin->slabcur,
 			    bin_info);
 			if (slab != NULL) {
 				/*
@@ -1338,7 +1357,7 @@ arena_bin_malloc_hard(tsdn_t *tsdn, arena_t *arena, bin_t *bin,
 
 	assert(extent_nfree_get(bin->slabcur) > 0);
 
-	return arena_slab_reg_alloc(slab, bin_info);
+	return arena_slab_reg_alloc(arena, slab, bin_info);
 }
 
 /* Choose a bin shard and return the locked bin. */
@@ -1380,7 +1399,7 @@ arena_tcache_fill_small(tsdn_t *tsdn, arena_t *arena, tcache_t *tcache,
 			unsigned tofill = nfill - i;
 			cnt = tofill < extent_nfree_get(slab) ?
 				tofill : extent_nfree_get(slab);
-			arena_slab_reg_alloc_batch(
+			arena_slab_reg_alloc_batch(arena,
 			   slab, &bin_infos[binind], cnt,
 			   tbin->avail - nfill + i);
 		} else {
@@ -1450,7 +1469,7 @@ arena_malloc_small(tsdn_t *tsdn, arena_t *arena, szind_t binind, bool zero) {
 	bin = arena_bin_choose_lock(tsdn, arena, binind, &binshard);
 
 	if ((slab = bin->slabcur) != NULL && extent_nfree_get(slab) > 0) {
-		ret = arena_slab_reg_alloc(slab, &bin_infos[binind]);
+		ret = arena_slab_reg_alloc(arena, slab, &bin_infos[binind]);
 	} else {
 		ret = arena_bin_malloc_hard(tsdn, arena, bin, binind, binshard);
 	}
@@ -1660,7 +1679,7 @@ arena_dalloc_bin_locked_impl(tsdn_t *tsdn, arena_t *arena, bin_t *bin,
 		arena_dalloc_junk_small(ptr, bin_info);
 	}
 
-	arena_slab_reg_dalloc(slab, slab_data, ptr);
+	arena_slab_reg_dalloc(arena, slab, slab_data, ptr);
 	unsigned nfree = extent_nfree_get(slab);
 	if (nfree == bin_info->nregs) {
 		arena_dissociate_bin_slab(arena, slab, bin);
@@ -2045,6 +2064,11 @@ arena_new(tsdn_t *tsdn, unsigned ind, extent_hooks_t *extent_hooks) {
 		}
 	}
 	assert(bin_addr == (uintptr_t)arena + arena_size);
+	
+	if (opt_mesh) {
+		arena->mesh_arena_data = mesh_arena_data_new(tsdn, base);
+		assert(arena->mesh_arena_data != NULL);
+	}
 
 	arena->base = base;
 	/* Set arena before creating background threads. */

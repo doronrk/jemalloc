@@ -1866,6 +1866,13 @@ extent_dalloc_wrapper(tsdn_t *tsdn, arena_t *arena,
 
 static void
 extent_destroy_default_impl(void *addr, size_t size) {
+	// TODO doronrk, note that its really a crucial invariant that
+	// all slab allocations come from the bump allocator.
+	// Otherwise, a slab allocation that doesn't come from the bump
+	// allocator will never get unmmaped. A non-slab allocation
+	// that does come from the bump allocator will get pointed 
+	// somewhere in the meshable arena, which may not be as much of
+	// a problem - need to think more.
 	if (opt_mesh && mesh_extent_in_meshable_area(addr, size)) {
 		mesh_extent_destroy(addr, size);
 	} else if (!have_dss || !extent_in_dss(addr)) {

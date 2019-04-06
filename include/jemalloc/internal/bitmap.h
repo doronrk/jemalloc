@@ -171,6 +171,7 @@ typedef struct bitmap_info_s {
 void bitmap_info_init(bitmap_info_t *binfo, size_t nbits);
 void bitmap_init(bitmap_t *bitmap, const bitmap_info_t *binfo, bool fill);
 size_t bitmap_size(const bitmap_info_t *binfo);
+uint8_t bitmap_get_logical_first_byte(bitmap_t *bitmap, const bitmap_info_t *binfo);
 
 static inline bool
 bitmap_full(bitmap_t *bitmap, const bitmap_info_t *binfo) {
