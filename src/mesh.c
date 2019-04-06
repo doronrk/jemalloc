@@ -15,6 +15,11 @@ bool opt_mesh = true;
 
 malloc_mutex_t alloc_lock;
 uintptr_t next_alloc;
+unsigned nmeshable_scs;
+unsigned nmeshable_bins_per_arena;
+unsigned binind_to_meshind_table[SC_NBINS];
+unsigned meshind_to_binind_table[SC_NBINS]; // (SC_NBINS - nmeshable_scs) unused at end
+
 void *mesh_file_base;
 int mesh_file_fd;
 // Make this configurable?
@@ -36,17 +41,104 @@ mesh_extent_destroy(void *addr, size_t size) {
 
 bool
 mesh_extent_in_meshable_area(void *addr, size_t size) {
-       uintptr_t begin = (uintptr_t)addr;
-       uintptr_t end = begin + size;
-       uintptr_t mesh_begin = (uintptr_t)mesh_file_base;
-       uintptr_t mesh_end = mesh_begin + mesh_file_size;
+	uintptr_t begin = (uintptr_t)addr;
+	uintptr_t end = begin + size;
+	uintptr_t mesh_begin = (uintptr_t)mesh_file_base;
+	uintptr_t mesh_end = mesh_begin + mesh_file_size;
 
-       if (begin >= mesh_begin && end <= mesh_end) {
-               return true;
-       }
-       assert((begin < mesh_begin && end < mesh_begin) ||
-           (begin >= mesh_end && end >= mesh_end));
-       return false;
+	if (begin >= mesh_begin && end <= mesh_end) {
+		return true;
+	}
+	assert((begin < mesh_begin && end < mesh_begin) ||
+	    (begin >= mesh_end && end >= mesh_end));
+	return false;
+}
+
+bool
+mesh_slab_is_candidate(extent_t *slab) {
+	szind_t binind = extent_szind_get(slab);
+	unsigned meshind = binind_to_meshind_table[binind];
+	assert(meshind < nmeshable_scs || meshind == SC_NBINS);
+	return meshind != SC_NBINS;
+}
+
+static void
+insert_into_bin_data(mesh_bin_data_t *bin_data, uint8_t key, extent_t *slab) {
+	extent_mesh_list_append(&bin_data->table[key], slab);
+}
+
+static void
+remove_from_bin_data(mesh_bin_data_t *bin_data, uint8_t key, extent_t *slab) {
+	extent_mesh_list_remove(&bin_data->table[key], slab);
+}
+
+static mesh_bin_data_t *
+get_map_for_slab(mesh_arena_data_t *data, const bin_info_t *bin_info, extent_t *slab) {
+	szind_t binind = extent_szind_get(slab);
+	unsigned meshind = binind_to_meshind_table[binind];
+	assert(meshind != SC_NBINS);
+	unsigned shard = extent_binshard_get(slab);
+	return &data->bin_datas[meshind].bin_data_shards[shard];
+}
+
+void
+mesh_slab_bitmap_update(mesh_arena_data_t *data, arena_slab_data_t *slab_data, const bin_info_t *bin_info, extent_t *slab) {
+	assert(!bitmap_full(slab_data->bitmap, &bin_info->bitmap_info));
+	assert(extent_nfree_get(slab) != bin_info->nregs);
+
+	mesh_bin_data_t *bin_data = get_map_for_slab(data, bin_info, slab);
+	uint8_t key = bitmap_get_logical_first_byte(slab_data->bitmap, &bin_info->bitmap_info);
+	insert_into_bin_data(bin_data, key, slab);
+}
+
+void
+mesh_slab_bitmap_invalidate(mesh_arena_data_t *data, arena_slab_data_t *slab_data, const bin_info_t *bin_info, extent_t *slab) {
+	assert(!bitmap_full(slab_data->bitmap, &bin_info->bitmap_info));
+	assert(extent_nfree_get(slab) != bin_info->nregs);
+	
+	mesh_bin_data_t *bin_data = get_map_for_slab(data, bin_info, slab);
+	uint8_t key = bitmap_get_logical_first_byte(slab_data->bitmap, &bin_info->bitmap_info);
+	remove_from_bin_data(bin_data, key, slab);
+}
+
+static void
+bin_data_init(mesh_bin_data_t *bin_data) {
+#ifdef JEMALLOC_DEBUG
+	bin_data->magic = MESH_MAGIC;
+#endif
+	for (size_t i = 0; i < (1 << 8); i++) {
+		extent_list_init(&bin_data->table[i]);
+	}
+}
+	
+mesh_arena_data_t *
+mesh_arena_data_new(tsdn_t *tsdn, base_t *base) {
+	size_t size = sizeof(mesh_arena_data_t) + nmeshable_scs * sizeof(mesh_bin_datas_t);
+	mesh_arena_data_t *arena_data = (mesh_arena_data_t *)base_alloc(tsdn, base, size, CACHELINE);
+#ifdef JEMALLOC_DEBUG
+	arena_data->magic = MESH_MAGIC;
+#endif
+	arena_data->bin_datas = (mesh_bin_datas_t *)(arena_data + 1);
+
+	size = sizeof(mesh_bin_data_t) * nmeshable_bins_per_arena;
+	
+	mesh_bin_data_t *bin_data_base = (mesh_bin_data_t *)base_alloc(tsdn, base, size, CACHELINE);
+	uintptr_t bin_data_addr = (uintptr_t)bin_data_base;
+	
+	for (size_t i = 0; i < nmeshable_scs; i++) {
+		arena_data->bin_datas[i].bin_data_shards = (mesh_bin_data_t *)bin_data_addr;
+#ifdef JEMALLOC_DEBUG
+		arena_data->bin_datas[i].magic = MESH_MAGIC;
+#endif
+		unsigned binind = meshind_to_binind_table[i];
+		bin_data_addr += sizeof(mesh_bin_data_t) * bin_infos[binind].n_shards;
+	}
+	assert(bin_data_addr == (uintptr_t)bin_data_base + size);
+
+	for (size_t i = 0; i < nmeshable_bins_per_arena; i++) {
+		bin_data_init(&bin_data_base[i]);
+	}	
+	return arena_data;
 }
 
 void *
@@ -115,8 +207,28 @@ mesh_boot(void) {
 	// Free physical resources
 	ret = fallocate(mesh_file_fd, (FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE), 0, mesh_file_size);
 	assert(!ret);
+	
 	next_alloc = (uintptr_t)mesh_file_base;
 	bump_frag_bytes = 0;
 	malloc_mutex_init(&alloc_lock, "mesh_alloc_lock", WITNESS_RANK_OMIT, malloc_mutex_rank_exclusive);
+	
+	nmeshable_scs = 0;	
+	nmeshable_bins_per_arena = 0;
+	for (size_t i = 0; i < SC_NBINS; i++) {
+		if (bin_infos[i].nregs <= 8 && bin_infos[i].nregs > 1) {
+			meshind_to_binind_table[nmeshable_scs] = i; 
+			binind_to_meshind_table[i] = nmeshable_scs++;
+			nmeshable_bins_per_arena += bin_infos[i].n_shards;
+		} else {
+			binind_to_meshind_table[i] = SC_NBINS;
+		}
+	}
+
+	for (size_t i = nmeshable_scs; i < SC_NBINS; i++) {
+		meshind_to_binind_table[nmeshable_scs] = SC_NBINS; 
+	}
+
+	assert(nmeshable_scs > 0);
+
 	return false;
 }

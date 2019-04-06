@@ -359,6 +359,11 @@ extent_init(extent_t *extent, arena_t *arena, void *addr, size_t size,
 	extent_zeroed_set(extent, zeroed);
 	extent_committed_set(extent, committed);
 	extent_dumpable_set(extent, dumpable);
+	// TODO: consider only doing this if slab is true, but then you also have to set it
+	// when an extent is split and becomes slabby.
+	if (opt_mesh) {
+		ql_elm_new(extent, e_slab_data.ql_mesh_link);
+	}
 	ql_elm_new(extent, ql_link);
 	if (config_prof) {
 		extent_prof_tctx_set(extent, NULL);
@@ -414,6 +419,16 @@ extent_list_replace(extent_list_t *list, extent_t *to_remove,
 static inline void
 extent_list_remove(extent_list_t *list, extent_t *extent) {
 	ql_remove(list, extent, ql_link);
+}
+
+static inline void
+extent_mesh_list_append(extent_list_t *list, extent_t *extent) {
+	ql_tail_insert(list, extent, e_slab_data.ql_mesh_link); // TODO fix derp
+}
+
+static inline void
+extent_mesh_list_remove(extent_list_t *list, extent_t *extent) {
+	ql_remove(list, extent, e_slab_data.ql_mesh_link); // TODO fix derp
 }
 
 static inline int

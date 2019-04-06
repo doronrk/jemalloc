@@ -119,3 +119,13 @@ size_t
 bitmap_size(const bitmap_info_t *binfo) {
 	return (bitmap_info_ngroups(binfo) << LG_SIZEOF_BITMAP);
 }
+
+uint8_t 
+bitmap_get_logical_first_byte(bitmap_t *bitmap, const bitmap_info_t *binfo) {
+#ifdef BITMAP_USE_TREE
+	// TODO 
+	assert(false);
+#endif
+	assert(binfo->nbits <= 8);
+	return ~((uint8_t)bitmap[0] & 0xff);
+}
