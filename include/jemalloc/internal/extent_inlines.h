@@ -431,6 +431,11 @@ extent_mesh_list_remove(extent_list_t *list, extent_t *extent) {
 	ql_remove(list, extent, e_slab_data.ql_mesh_link); // TODO fix derp
 }
 
+static inline extent_t *
+extent_mesh_list_first(const extent_list_t *list) {
+	return ql_first(list);
+}
+
 static inline int
 extent_sn_comp(const extent_t *a, const extent_t *b) {
 	size_t a_sn = extent_sn_get(a);

@@ -27,6 +27,84 @@ size_t mesh_file_size = (1l << 30) * 256; // 256 GB
 // num wasted bytes due to fragmentation caused by alignment
 size_t bump_frag_bytes;
 
+
+static void
+mesh_extents(extent_t *extent_a, extent_t *extent_b) {
+	// TODO if opt_mesh_dry_run, fill out stats and return early
+	LOG("mesh", "would have meshed extents");
+}
+
+
+static void
+mesh_lists(mesh_bitmap_map_t *bitmap_map, uint8_t keya, uint8_t keyb) {
+	extent_list_t *extents_a = &bitmap_map->table[keya];
+	extent_list_t *extents_b = &bitmap_map->table[keyb];
+	extent_t *extent_a;
+	extent_t *extent_b;
+	while (((extent_a = extent_mesh_list_first(extents_a)) != NULL) &&
+		((extent_b = extent_mesh_list_first(extents_b)) != NULL)) {
+		// TODO assert that bitmap fullness corresponds to keya and keyb
+		extent_mesh_list_remove(extents_a, extent_a);
+		extent_mesh_list_remove(extents_b, extent_b);
+		mesh_extents(extent_a, extent_b);
+		// TODO add these extents to some other list
+		// perhaps arena->mesh_arena_data.mesh_bin_data[binind].shards[binshard].meshed_extents
+	}	
+}
+
+void
+mesh_bin(bin_t *bin, mesh_bitmap_map_t *bitmap_map) {
+	// bin must be locked
+	for (uint8_t key = 0xfe; key >= 0x80; key--) {
+		uint8_t compliment = ~key;
+		while (compliment > 0) {
+			if ((compliment & key) == 0) {
+				LOG("mesh.lists", "key: %x comp: %d", key, compliment);
+				mesh_lists(bitmap_map, key, compliment);
+			}
+			compliment--;
+		}	
+	}
+}
+
+void
+mesh_arena(tsdn_t *tsdn, arena_t *arena) {
+	bin_t *bin;
+	mesh_bitmap_map_t *bitmap_map;
+	mesh_arena_data_t *data = arena->mesh_arena_data;
+
+	for (unsigned meshind = 0; meshind < nmeshable_scs; meshind++) {
+		szind_t binind = meshind_to_binind_table[meshind];
+		bin_info_t *bin_info = &bin_infos[binind];
+		LOG("mesh.bin", "meshing meshind: %u binind: %u", meshind, binind);
+		for (unsigned binshard = 0; binshard < bin_info->n_shards; binshard++) {
+			bitmap_map = &data->bitmap_maps[meshind].mesh_bitmap_map_shards[binshard];
+			bin = &arena->bins[binind].bin_shards[binshard];
+				
+			malloc_mutex_lock(tsdn, &bin->lock);
+			mesh_bin(bin, bitmap_map);			
+			malloc_mutex_unlock(tsdn, &bin->lock);	
+		}	
+	}
+}
+
+JEMALLOC_EXPORT void JEMALLOC_NOTHROW
+je_mesh_all_arenas() {
+	unsigned narenas, i;
+	tsdn_t *tsdn;
+
+	LOG("mesh", "about to mesh all arenas");
+	tsdn = tsdn_fetch();
+
+	for (i = 0, narenas = narenas_total_get(); i < narenas; i++) {
+		arena_t *arena = arena_get(tsdn, i, false);
+		if (arena != NULL) {
+			LOG("mesh.arena", "meshing arena ind: %u", i);
+			mesh_arena(tsdn, arena);
+		}
+	}
+}
+
 static off_t
 addr_to_offset(void *addr) {
 	assert((uintptr_t)addr >= (uintptr_t)mesh_file_base && (uintptr_t)addr < ((uintptr_t)mesh_file_base + mesh_file_size));

@@ -89,7 +89,7 @@ void allocate_some() {
 	}
 }
 int main(int argc, char** argv) {
-	mesh_test();
+	mesh_all_arenas();
 	std::cout << "ran the program" << std::endl;
 	return 0;
 }
