@@ -13,6 +13,8 @@ extern void *mesh_file_base;
 typedef struct mesh_bin_data_s mesh_bin_data_t;
 struct mesh_bin_data_s {
 	extent_list_t	table[1 << 8];
+	unsigned	lengths[1 << 8];
+	unsigned	nextents_total;
 #ifdef JEMALLOC_DEBUG
 	uint32_t magic;
 #endif	

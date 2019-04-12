@@ -1000,6 +1000,7 @@ arena_slab_dalloc(tsdn_t *tsdn, arena_t *arena, extent_t *slab) {
 static void
 arena_bin_slabs_nonfull_insert(arena_t *arena, bin_t *bin, const bin_info_t *bin_info, extent_t *slab) {
 	assert(extent_nfree_get(slab) > 0);
+	bin->slabs_nonfull_size++;
 	extent_heap_insert(&bin->slabs_nonfull, slab);
 	if (opt_mesh && mesh_slab_is_candidate(slab)) {
 		arena_slab_data_t *slab_data = extent_slab_data_get(slab);
@@ -1012,9 +1013,13 @@ arena_bin_slabs_nonfull_remove(arena_t *arena, bin_t *bin, const bin_info_t *bin
 	// If slab is not full, then its mesh shape is tracked and needs to be invalidated
 	if (opt_mesh && mesh_slab_is_candidate(slab)) {
 		assert(slab != bin->slabcur);
+		/*
 		arena_slab_data_t *slab_data = extent_slab_data_get(slab);
 		mesh_slab_bitmap_invalidate(arena->mesh_arena_data, slab_data, bin_info, slab);
+		*/
 	}
+	assert(bin->slabs_nonfull_size != 0);
+	bin->slabs_nonfull_size--;
 	extent_heap_remove(&bin->slabs_nonfull, slab);
 }
 
@@ -1024,6 +1029,8 @@ arena_bin_slabs_nonfull_tryget(arena_t *arena, bin_t *bin, const bin_info_t *bin
 	if (slab == NULL) {
 		return NULL;
 	}
+	assert(bin->slabs_nonfull_size != 0);
+	bin->slabs_nonfull_size--;
 	if (opt_mesh && mesh_slab_is_candidate(slab)) {
 		assert(slab != bin->slabcur);
 		arena_slab_data_t *slab_data = extent_slab_data_get(slab);
@@ -2071,6 +2078,11 @@ arena_new(tsdn_t *tsdn, unsigned ind, extent_hooks_t *extent_hooks) {
 		}
 	}
 	assert(bin_addr == (uintptr_t)arena + arena_size);
+
+	if (opt_mesh) {
+		arena->mesh_arena_data = mesh_arena_data_new(tsdn, base);
+		assert(arena->mesh_arena_data != NULL);
+	}
 
 	arena->base = base;
 	/* Set arena before creating background threads. */

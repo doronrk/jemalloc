@@ -5,6 +5,27 @@
 #include <thread>
 #include <vector>
 #include <cassert>
+
+void fragmentation() {
+	std::vector<std::thread> threads;
+	for (size_t i = 0; i < 1; i++) {
+		threads.push_back(std::thread([]() {
+			std::vector<void *> ptrs;
+			for (size_t j = 0; j < 1024 * 1024; j++) {
+				ptrs.push_back(malloc(3000));
+			}
+			while (true) {
+				size_t ind = rand() % (1024 * 1024);
+				free(ptrs[ind]);
+				ptrs[ind] = malloc(3000);
+			}
+		}));
+	}
+	for (auto& t : threads) {
+		t.join();
+	}
+}
+
 void mesh_test() {
 	void* mem1a = malloc(2048);
 	void* mem1b = malloc(2048);
@@ -89,7 +110,7 @@ void allocate_some() {
 	}
 }
 int main(int argc, char** argv) {
-	mesh_test();
+	fragmentation();
 	std::cout << "ran the program" << std::endl;
 	return 0;
 }

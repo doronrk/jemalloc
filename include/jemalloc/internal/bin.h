@@ -75,6 +75,8 @@ struct bin_s {
 	 */
 	extent_heap_t		slabs_nonfull;
 
+	unsigned		slabs_nonfull_size;
+
 	/* List used to track full slabs. */
 	extent_list_t		slabs_full;
 

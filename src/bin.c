@@ -73,6 +73,7 @@ bin_init(bin_t *bin) {
 	bin->slabcur = NULL;
 	extent_heap_new(&bin->slabs_nonfull);
 	extent_list_init(&bin->slabs_full);
+	bin->slabs_nonfull_size = 0;
 	if (config_stats) {
 		memset(&bin->stats, 0, sizeof(bin_stats_t));
 	}

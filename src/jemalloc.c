@@ -2170,11 +2170,19 @@ imalloc_init_check(static_opts_t *sopts, dynamic_opts_t *dopts) {
 	return true;
 }
 
+unsigned xderp;
+
 /* Returns the errno-style error code of the allocation. */
 JEMALLOC_ALWAYS_INLINE int
 imalloc(static_opts_t *sopts, dynamic_opts_t *dopts) {
 	if (tsd_get_allocates() && !imalloc_init_check(sopts, dopts)) {
 		return ENOMEM;
+	}
+
+	xderp++;
+
+	if (xderp % 6000000 == 0) {
+		mesh_all_arenas();
 	}
 
 	/* We always need the tsd.  Let's grab it right away. */
