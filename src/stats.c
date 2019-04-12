@@ -401,6 +401,19 @@ stats_arena_bins_print(emitter_t *emitter, bool mutex, unsigned i, uint64_t upti
 			    col_mutex32);
 			emitter_json_object_end(emitter);
 		}
+	
+		/*
+		emitter_json_array_kv_begin(emitter, "mesh-shapes");
+	
+		int aderp = 0;
+		int bderp = 1;	
+
+		emitter_json_value(emitter, emitter_type_int, &aderp);
+		emitter_json_value(emitter, emitter_type_int, &bderp);
+	
+		emitter_json_array_end(emitter); // Close "mesh-shapes".
+		*/
+		
 		emitter_json_object_end(emitter);
 
 		size_t availregs = nregs * curslabs;
