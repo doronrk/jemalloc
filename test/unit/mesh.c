@@ -56,21 +56,71 @@ TEST_BEGIN(test_mesh_populate_bin_data) {
 	malloc_mutex_unlock(tsdn, &bin->lock);
 
 	mesh_populate_bin_data(bin, binfo, &mesh_bin_data);
+
+	for (size_t i = 0; i < (1 << 8); i++) {
+		mesh_bin_stats_t *stats = &mesh_bin_data.stats;
+		unsigned count = stats->shape_counts[i];
+		if (i == 0x1) {
+			assert(count == 32);
+		} else if (i == 0x2) {
+			assert(count == 32);
+		} else {
+			assert(count == 0);
+		}
+	}
+
 	mesh_populate_bin_data(bin, binfo, &mesh_bin_data);
+
+	for (size_t i = 0; i < (1 << 8); i++) {
+		mesh_bin_stats_t *stats = &mesh_bin_data.stats;
+		unsigned count = stats->shape_counts[i];
+		if (i == 0x1) {
+			assert(count == 32);
+		} else if (i == 0x2) {
+			assert(count == 32);
+		} else {
+			assert(count == 0);
+		}
+	}
 
 	for (size_t i = 0; i < 32; i++) {
 		size_t ind = (i * 2) + ((i + 1) % 2);
 		dallocx(ptrs[ind], 0);
 	}
 
+	assert_d_eq(mallctl("thread.tcache.flush", NULL, NULL, NULL, 0),
+	    opt_tcache ? 0 : EFAULT, "Unexpected mallctl() result");
+
 	mesh_populate_bin_data(bin, binfo, &mesh_bin_data);
+
+	for (size_t i = 0; i < (1 << 8); i++) {
+		mesh_bin_stats_t *stats = &mesh_bin_data.stats;
+		unsigned count = stats->shape_counts[i];
+		if (i == 0x1) {
+			assert(count == 16);
+		} else if (i == 0x2) {
+			assert(count == 16);
+		} else {
+			assert(count == 0);
+		}
+	}
+
 
 	for (size_t i = 32; i < 64; i++) {
 		size_t ind = (i * 2) + ((i + 1) % 2);
 		dallocx(ptrs[ind], 0);
 	}
 
+	assert_d_eq(mallctl("thread.tcache.flush", NULL, NULL, NULL, 0),
+	    opt_tcache ? 0 : EFAULT, "Unexpected mallctl() result");
+
 	mesh_populate_bin_data(bin, binfo, &mesh_bin_data);
+
+	for (size_t i = 0; i < (1 << 8); i++) {
+		mesh_bin_stats_t *stats = &mesh_bin_data.stats;
+		unsigned count = stats->shape_counts[i];
+		assert(count == 0);
+	}
 }
 TEST_END
 

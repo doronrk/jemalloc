@@ -205,7 +205,7 @@ bitmap_get(bitmap_t *bitmap, const bitmap_info_t *binfo, size_t bit) {
 static inline uint8_t
 bitmap_get_first_logical_byte(bitmap_t *bitmap, const bitmap_info_t *binfo) {
 	assert(binfo->nbits <= 8);
-	return ~((uint8_t)bitmap[0] & 0xff);
+	return (uint8_t)(~bitmap[0]) & ((1 << binfo->nbits) - 1);
 }
 
 static inline void
