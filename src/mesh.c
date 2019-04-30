@@ -81,6 +81,7 @@ mesh_slab_is_candidate(extent_t *slab) {
 
 static void
 insert_into_bin_data(mesh_bin_data_t *bin_data, uint8_t key, extent_t *slab) {
+	assert(slab != NULL);
 	if (config_stats) {
 		bin_data->stats.shape_counts[key]++;
 	}
